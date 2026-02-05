@@ -1,0 +1,27 @@
+{
+  "name": "Teclado Virtual JEA",
+  "short_name": "Teclado",
+  "start_url": "index.html?v=4",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#0f1115",
+  "background_color": "#0f1115",
+  "icons": [
+    {
+      "src": "android-chrome-192x192.png?v=4",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "android-chrome-512x512.png?v=4",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "maskable-512x512.png?v=4",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

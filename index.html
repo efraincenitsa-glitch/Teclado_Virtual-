@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0f1115" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=4" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=4" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=4" />
+  <link rel="manifest" href="manifest.webmanifest?v=4" />
+  <title>Teclado Virtual JEA</title>
+  <style>
+    :root{ --bg:#0f1115; --fg:#e9eef5; --muted:#a8b3c7; --acc:#4cc9f0; --card:#151924; --line:#243045; --hot:#ef476f; --ok:#06d6a0; }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    header{position:sticky;top:0;background:linear-gradient(180deg,var(--bg),rgba(15,17,21,.85));backdrop-filter:blur(6px);z-index:10;border-bottom:1px solid #1c2333}
+    .wrap{max-width:1024px;margin:0 auto;padding:14px 16px}
+    h1{font-size:1.25rem;margin:0 0 4px}
+    section{background:var(--card);border:1px solid #1c2333;border-radius:12px;padding:12px;margin-top:12px}
+    label{font-size:.9rem;color:var(--muted)}
+    select,input[type="number"],input[type="text"],input[type="range"]{width:100%;padding:10px;border-radius:10px;border:1px solid #263045;background:#0f1320;color:var(--fg)}
+    .row{display:grid;gap:10px}
+    .row.cols-3{grid-template-columns:1fr 1fr 1fr}
+    .row.cols-2{grid-template-columns:1fr 1fr}
+    .btn{appearance:none;border:0;border-radius:12px;padding:10px 14px;background:var(--acc);color:#001018;font-weight:700;cursor:pointer}
+    .btn.alt{background:#303b55;color:var(--fg)}
+
+    .kbd-wrap{position:relative;background:#0c101a;border:1px solid var(--line);border-radius:12px;padding:16px;overflow:auto}
+    .kbd{position:relative;height:280px;min-width:840px;margin:0 auto;background:linear-gradient(180deg,#0b0f19,#0a0d16);border-radius:10px;padding:12px}
+
+    /* Layers to guarantee stacking: blacks are always above whites */
+    .layer{position:absolute;left:12px;right:12px;top:0;bottom:0}
+    .layer.whites{z-index:1}
+    .layer.blacks{z-index:3}
+
+    .key{position:absolute;bottom:18px;border-radius:6px;user-select:none;touch-action:manipulation}
+
+    .white{
+      width:60px;height:200px;
+      background:linear-gradient(180deg,#f4f6fb,#cfd6e6);
+      border:1px solid #9aa6bf;
+      box-shadow:inset 0 -6px 16px rgba(0,0,0,.25), 0 6px 12px rgba(0,0,0,.3);
+    }
+    .black{
+      width:38px;height:120px;
+      background:linear-gradient(180deg,#404652,#0c0f15);
+      border:1px solid #0a0d12;
+      box-shadow:inset 0 8px 10px rgba(255,255,255,.08), 0 6px 10px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.45);
+    }
+    .playing{ box-shadow:0 0 10px var(--acc), inset 0 -6px 16px rgba(0,0,0,.25); }
+
+    .key label{position:absolute;bottom:6px;left:0;right:0; text-align:center; font-size:.78rem; color:#111; background:rgba(255,255,255,.6); border-radius:6px; display:inline-block; width:auto; margin:0 auto; padding:0 6px}
+    .black label{color:#cfe1ff;background:rgba(0,0,0,.55)}
+
+    .song-notes{ background:#0c101a; border:1px solid var(--line); border-radius:8px; padding:8px; white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:#cfe1ff; }
+
+    @media (max-width:900px){ .kbd{min-width:720px;height:240px} .white{width:52px;height:180px} .black{width:32px;height:108px} }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Teclado Virtual JEA – Aprende Música</h1>
+      <div class="muted">Toca con clic o toque, reproduce canciones básicas (dominio público) y aprende notas. Funciona offline.</div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <section>
+        <h2>⚙️ Ajustes</h2>
+        <div class="row cols-3">
+          <div>
+            <label>Onda</label>
+            <select id="waveSel">
+              <option value="sine">Seno</option>
+              <option value="triangle">Triangular</option>
+              <option value="square">Cuadrada</option>
+              <option value="sawtooth">Sierra</option>
+            </select>
+          </div>
+          <div>
+            <label>Volumen</label>
+            <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5" />
+          </div>
+          <div class="inline" style="margin-top:20px">
+            <label><input type="checkbox" id="sustain"/> &nbsp;Sustain</label>
+            <label><input type="checkbox" id="labelES" checked/> &nbsp;Mostrar Do‑Re‑Mi</label>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>🎹 Teclado</h2>
+        <div class="kbd-wrap">
+          <div class="kbd" id="kbd">
+            <div class="layer whites" id="layerWhites"></div>
+            <div class="layer blacks" id="layerBlacks"></div>
+          </div>
+        </div>
+        <div class="muted" style="margin-top:6px">Tip: usa audífonos para apreciar mejor la afinación.</div>
+      </section>
+
+      <section>
+        <h2>📚 Canciones (dominio público)</h2>
+        <div class="row cols-2">
+          <div>
+            <label>Selecciona canción</label>
+            <select id="songSel"></select>
+          </div>
+          <div class="inline" style="margin-top:20px">
+            <button class="btn" id="playSong">Reproducir</button>
+            <button class="btn alt" id="stopSong">Detener</button>
+          </div>
+        </div>
+        <div class="muted" id="songInfo" style="margin-top:6px"></div>
+        <pre id="songNotes" class="song-notes" style="margin-top:6px"></pre>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    // ===== Utilidades de notas =====
+    const ES_SHARP = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La','La#','Si'];
+    const ES_FLAT  = ['Do','Reb','Re','Mib','Mi','Fa','Solb','Sol','Lab','La','Sib','Si'];
+    const EN_SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+    function idxFromName(name){
+      const sets = [EN_SHARP, ES_SHARP, ES_FLAT];
+      const up = name.replace('♯','#').replace('♭','b').trim();
+      for(const arr of sets){
+        for(let i=0;i<12;i++) if(arr[i].toUpperCase()===up.toUpperCase()) return i;
+      }
+      return 0;
+    }
+    function esName(idx, flats=false){ return (flats?ES_FLAT:ES_SHARP)[(idx%12+12)%12]; }
+
+    function toES(note){
+      const m = /^([A-Ga-g])(#|b)?(\d+)$/.exec(note);
+      if(!m) return note;
+      const name = (m[1].toUpperCase() + (m[2]||''));
+      const oct = m[3];
+      const idx = idxFromName(name);
+      return esName(idx,false) + oct;
+    }
+
+    function midiFromNote(note){
+      const m = /^([A-Ga-g]|Do|Re|Mi|Fa|Sol|La|Si)(#|b|♯|♭)?(\d+)$/.exec(note);
+      if(!m){ return 60; }
+      let name = m[1]; const acc = m[2]||''; const oct = parseInt(m[3],10);
+      let idx;
+      if(/[A-Ga-g]/.test(name)) idx = idxFromName(name.toUpperCase()+acc.replace('♯','#').replace('♭','b'));
+      else { const mapES = {Do:0,Re:2,Mi:4,Fa:5,Sol:7,La:9,Si:11}; idx = mapES[name] + (acc in {'b':1,'♭':1}?-1:(acc in {'#':1,'♯':1}?1:0)); }
+      return (oct+1)*12 + ((idx%12+12)%12);
+    }
+    function freqFromMidi(m){ return 440*Math.pow(2,(m-69)/12); }
+
+    // ===== Audio =====
+    const AudioCtx = window.AudioContext || window.webkitAudioContext; const AC = new AudioCtx();
+    let masterGain = AC.createGain(); masterGain.gain.value = 0.5; masterGain.connect(AC.destination);
+
+    function playNote(note, dur=0.5){
+      const m = midiFromNote(note); const o = AC.createOscillator(); const g = AC.createGain();
+      o.type = document.getElementById('waveSel').value; o.frequency.value = freqFromMidi(m);
+      g.gain.value = 0.0001; o.connect(g); g.connect(masterGain);
+      const sustain = document.getElementById('sustain').checked; const now = AC.currentTime;
+      o.start(now); g.gain.exponentialRampToValueAtTime(0.7, now+0.01);
+      const end = now + dur; if(!sustain){ g.gain.exponentialRampToValueAtTime(0.0001, end-0.02); o.stop(end); }
+      else { g.gain.exponentialRampToValueAtTime(0.2, end); setTimeout(()=>{ try{ g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime+0.02); o.stop(AC.currentTime+0.04);}catch(e){} }, dur*1000); }
+    }
+
+    // ===== Teclado visual con capas =====
+    const kbd = document.getElementById('kbd');
+    const whitesLayer = document.getElementById('layerWhites');
+    const blacksLayer = document.getElementById('layerBlacks');
+
+    const whiteOrder = ['C','D','E','F','G','A','B'];
+    const blackAfter = {C:true,D:true,E:false,F:true,G:true,A:true,B:false};
+    const startOct = 3; const whiteTotal = 14;
+
+    function buildKeyboard(){
+      whitesLayer.innerHTML=''; blacksLayer.innerHTML='';
+      const labelES = document.getElementById('labelES').checked;
+      const w=60; const spacing=4; const blacks=[];
+      for(let i=0;i<whiteTotal;i++){
+        const noteIndex=i%7; const name=whiteOrder[noteIndex]; const oct = startOct + Math.floor((i+ (name==='C'?0:1))/7);
+        const div=document.createElement('div'); div.className='key white'; div.style.left=(i*(w+spacing))+'px';
+        div.dataset.note=name+oct; const lbl=document.createElement('label'); lbl.textContent = labelES ? ['Do','Re','Mi','Fa','Sol','La','Si'][['C','D','E','F','G','A','B'].indexOf(name)] : name; div.appendChild(lbl);
+        div.onpointerdown=()=>{ div.classList.add('playing'); masterGain.gain.value=parseFloat(document.getElementById('vol').value); playNote(name+oct, 0.5); };
+        div.onpointerup=()=>div.classList.remove('playing');
+        whitesLayer.appendChild(div);
+        if(blackAfter[name]) blacks.push({x: i*(w+spacing) + w - 19, note:(name+'#'+oct)});
+      }
+      blacks.forEach(b=>{ const d=document.createElement('div'); d.className='key black'; d.style.left=b.x+'px'; d.dataset.note=b.note; const lbl=document.createElement('label'); lbl.textContent='♯'; d.appendChild(lbl); d.onpointerdown=()=>{ d.classList.add('playing'); masterGain.gain.value=parseFloat(document.getElementById('vol').value); playNote(b.note, 0.5); }; d.onpointerup=()=>d.classList.remove('playing'); blacksLayer.appendChild(d); });
+    }
+
+    // ===== Canciones (dominio público) =====
+    const SONGS = [
+      {title:'Ode to Joy (Beethoven)', bpm:100, notes:['E4','E4','F4','G4','G4','F4','E4','D4','C4','C4','D4','E4','E4','D4','D4'], dur:0.5},
+      {title:'Twinkle Twinkle Little Star', bpm:90, notes:['C4','C4','G4','G4','A4','A4','G4','F4','F4','E4','E4','D4','D4','C4'], dur:0.5},
+      {title:'Frère Jacques', bpm:100, notes:['C4','D4','E4','C4','C4','D4','E4','C4','E4','F4','G4','E4','F4','G4'], dur:0.5},
+      {title:'Au Clair de la Lune', bpm:90, notes:['C4','D4','E4','C4','C4','D4','E4','C4','E4','F4','G4','G4','F4','E4','D4','C4'], dur:0.5},
+      {title:'London Bridge', bpm:96, notes:['G4','A4','G4','F4','E4','F4','G4','D4','E4','F4','E4','F4','G4','D4','G4','A4','G4','F4','E4','F4','G4','D4'], dur:0.4},
+      {title:'Mary Had a Little Lamb', bpm:92, notes:['E4','D4','C4','D4','E4','E4','E4','D4','D4','D4','E4','G4','G4'], dur:0.5},
+      {title:'Old MacDonald', bpm:100, notes:['G4','G4','G4','D4','E4','E4','D4','B3','B3','A4','A4','G4'], dur:0.5},
+      {title:'Row Row Row Your Boat', bpm:96, notes:['C4','C4','C4','D4','E4','E4','D4','E4','F4','G4','C5','C5','C5','G4','G4','F4','E4','D4','C4'], dur:0.4},
+      {title:'Jingle Bells', bpm:108, notes:['E4','E4','E4','E4','E4','E4','E4','G4','C4','D4','E4','F4','F4','F4','F4','F4','E4','E4','E4','E4','D4','D4','E4','D4','G4'], dur:0.4},
+      {title:'The First Noel', bpm:84, notes:['D4','G4','A4','B4','C5','B4','A4','G4','A4','B4','C5','D5','C5','B4','A4','G4'], dur:0.5},
+      {title:'Amazing Grace', bpm:80, notes:['G4','B4','D5','G5','E5','D5','B4','G4','G4','B4','D5','G5','E5','D5','B4','G4'], dur:0.5},
+      {title:'Greensleeves', bpm:84, notes:['E4','G4','A4','B4','C5','B4','A4','G4','A4','B4','C5','D5','C5','B4','A4','G4'], dur:0.5},
+      {title:'When the Saints', bpm:100, notes:['C4','E4','F4','G4','C5','E5','F5','G5','E5','C5','E5','F5','G5','C5'], dur:0.4},
+      {title:'Auld Lang Syne', bpm:88, notes:['G4','C5','C5','A4','C5','B4','A4','G4','A4','C5','B4','G4','E4','E4','G4','A4','C5','A4','G4'], dur:0.5},
+      {title:'Brahms Lullaby', bpm:72, notes:['G4','E4','G4','E4','G4','E4','D4','E4','C4','E4','G4','E4','G4','E4','G4','E4','D4','E4'], dur:0.45},
+      {title:'Canon in D (tema)', bpm:84, notes:['D4','A4','B4','F#4','G4','D4','G4','A4','D5','A4','B4','F#4','G4','D4','G4','A4'], dur:0.45},
+      {title:'Für Elise (tema)', bpm:96, notes:['E5','D#5','E5','D#5','E5','B4','D5','C5','A4','C4','E4','A4','B4','E4','G#4','B4','C5'], dur:0.35},
+      {title:'Scarborough Fair', bpm:84, notes:['D4','G4','A4','B4','A4','G4','E4','D4','G4','A4','B4','C5','B4','A4','G4'], dur:0.5},
+      {title:'Camptown Races', bpm:100, notes:['G4','E4','D4','E4','G4','G4','E4','D4','E4','G4','A4','B4','B4','A4','G4','E4','D4','E4','C4'], dur:0.4},
+      {title:'O Christmas Tree', bpm:88, notes:['G4','C5','C5','B4','A4','G4','A4','B4','C5','C5','B4','A4','G4','A4','B4','C5','D5','E5','E5','D5','C5','B4','A4','B4','C5'], dur:0.4},
+    ];
+
+    const songSel = document.getElementById('songSel');
+    SONGS.forEach((s,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=s.title; songSel.appendChild(o); });
+
+    let playTimer=null, playIndex=0;
+
+    function renderSongNotes(){
+      const useES = document.getElementById('labelES').checked;
+      const s = SONGS[parseInt(songSel.value,10)||0];
+      const tokens = s.notes.map(n => useES ? toES(n) : n);
+      // formatear en líneas de 8 notas
+      let out = [];
+      for(let i=0;i<tokens.length;i+=8){ out.push(tokens.slice(i,i+8).join(' ')); }
+      document.getElementById('songNotes').textContent = out.join('\n');
+      document.getElementById('songInfo').textContent = `BPM ${s.bpm} • ${s.notes.length} notas`;
+    }
+
+    function playSelectedSong(){
+      if(playTimer) return;
+      const s = SONGS[parseInt(songSel.value,10)||0];
+      const beat = 60/(s.bpm||90);
+      renderSongNotes();
+      playIndex=0;
+      playTimer = setInterval(()=>{
+        if(playIndex >= s.notes.length){ stopSong(); return; }
+        const note = s.notes[playIndex];
+        const dur = (s.dur||0.5);
+        playNote(note, dur);
+        // Resaltar tecla
+        const node = [...document.querySelectorAll('.key')].find(k=> (k.dataset.note||'')===note.replace('♯','#'));
+        if(node){ node.classList.add('playing'); setTimeout(()=>node.classList.remove('playing'), 240); }
+        playIndex++;
+      }, beat*1000);
+    }
+    function stopSong(){ clearInterval(playTimer); playTimer=null; }
+
+    document.getElementById('playSong').addEventListener('click', playSelectedSong);
+    document.getElementById('stopSong').addEventListener('click', stopSong);
+    document.getElementById('labelES').addEventListener('change', ()=>{ buildKeyboard(); renderSongNotes(); });
+    songSel.addEventListener('change', renderSongNotes);
+
+    // Service Worker (cache bust v4)
+    if('serviceWorker' in navigator){ const swCode = `const CACHE='keyboard-app-v4';const ASSETS=[self.location.href,'apple-touch-icon.png?v=4','favicon-32x32.png?v=4','favicon-16x16.png?v=4','android-chrome-192x192.png?v=4','android-chrome-512x512.png?v=4','manifest.webmanifest?v=4'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)))});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(resp=>{if(e.request.method==='GET'){const copy=resp.clone();caches.open(CACHE).then(c=>c.put(e.request,copy))}return resp}).catch(()=>caches.match(self.location.href))))});`; const blob=new Blob([swCode],{type:'text/javascript'}); const url=URL.createObjectURL(blob); navigator.serviceWorker.register(url); }
+
+    // Init
+    buildKeyboard();
+    renderSongNotes();
+  </script>
+</body>
+</html>
